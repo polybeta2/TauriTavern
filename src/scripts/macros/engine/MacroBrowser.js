@@ -332,7 +332,7 @@ export function formatMacroSignature(macro) {
         if (macro.aliasOf) {
             // Replace all occurrences of the macro name with the alias for this list
             const escapedMainName = escapeRegex(macro.aliasOf);
-            return macro.displayOverride.replace(new RegExp(`(?<=[\\b{\\s])${escapedMainName}(?=[\\b}:\\s])`, 'g'), `${macro.name}`);
+            return macro.displayOverride.replace(new RegExp(`([\\b{\\s])${escapedMainName}(?=[\\b}:\\s])`, 'g'), `$1${macro.name}`);
         }
         return macro.displayOverride;
     }

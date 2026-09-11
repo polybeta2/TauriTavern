@@ -1,0 +1,79 @@
+name: Build iOS 15 IPA (iPhone 7 / TrollStore)
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feat/ios15-iphone7-compat
+
+jobs:
+  build-ios:
+    name: Build iOS IPA
+    runs-on: macos-14
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "src-tauri -> target"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+          run_install: false
+
+      - name: Install Node dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build web frontend
+        run: pnpm run web:build
+
+      - name: Enable HTTP access for mobile
+        run: ./scripts/ci/configure-mobile-http.sh enable ios
+
+      - name: Build unsigned iOS Application
+        run: |
+          set -euo pipefail
+          xcodebuild build \
+            -project src-tauri/crates/tauritavern/gen/apple/tauritavern.xcodeproj \
+            -scheme tauritavern_iOS \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=""
+
+      - name: Package unsigned IPA
+        run: |
+          set -euo pipefail
+          APP_PATH=$(find build/Build/Products/Release-iphoneos -maxdepth 1 -name "*.app" -print -quit)
+          if [ -z "$APP_PATH" ]; then
+            echo "Error: Could not find built .app in build/Build/Products/Release-iphoneos"
+            exit 1
+          fi
+          echo "Found built app at: $APP_PATH"
+          mkdir -p Payload
+          cp -R "$APP_PATH" Payload/
+          zip -r -q TauriTavern-iOS15.8-iPhone7.ipa Payload
+          ls -lh TauriTavern-iOS15.8-iPhone7.ipa
+
+      - name: Upload IPA Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: TauriTavern-iOS15.8-iPhone7-ipa
+          path: TauriTavern-iOS15.8-iPhone7.ipa
+          if-no-files-found: error

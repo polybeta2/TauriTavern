@@ -2,6 +2,33 @@
 
 window.__TAURI_RUNNING__ = true;
 
+// Polyfills for WebKit / Safari 15 (e.g. iOS 15.8 on iPhone 7)
+if (!Array.prototype.toSorted) {
+    Array.prototype.toSorted = function (compareFn) {
+        return [...this].sort(compareFn);
+    };
+}
+if (!Array.prototype.toReversed) {
+    Array.prototype.toReversed = function () {
+        return [...this].reverse();
+    };
+}
+if (!Array.prototype.toSpliced) {
+    Array.prototype.toSpliced = function (start, deleteCount, ...items) {
+        const copy = [...this];
+        copy.splice(start, deleteCount, ...items);
+        return copy;
+    };
+}
+if (!Array.prototype.with) {
+    Array.prototype.with = function (index, value) {
+        const copy = [...this];
+        copy[index < 0 ? copy.length + index : index] = value;
+        return copy;
+    };
+}
+
+
 // In some WebKit builds, `location.href` may omit the trailing slash for origin-only
 // URLs (e.g. `tauri://localhost`). jQuery UI Tabs uses `anchor.href` vs
 // `location.href` (sans hash) to decide whether a tab is local; the mismatch can
