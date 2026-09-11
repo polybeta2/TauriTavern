@@ -33,33 +33,10 @@ jobs:
       - name: Setup unsigned xcodebuild wrapper
         run: |
           DEVELOPER_DIR=$(xcode-select -p)
-          echo "Xcode developer directory: $DEVELOPER_DIR"
+          echo "Configuring xcodebuild wrapper for: $DEVELOPER_DIR"
           REAL_XCODEBUILD="$DEVELOPER_DIR/usr/bin/xcodebuild"
-          
           sudo mv "$REAL_XCODEBUILD" "${REAL_XCODEBUILD}.real"
-          sudo tee "$REAL_XCODEBUILD" > /dev/null << 'EOF'
-#!/bin/bash
-DEVELOPER_DIR=$(xcode-select -p)
-REAL="${DEVELOPER_DIR}/usr/bin/xcodebuild.real"
-
-NEW_ARGS=()
-for arg in "$@"; do
-  if [ "$arg" != "-allowProvisioningUpdates" ]; then
-    NEW_ARGS+=("$arg")
-  fi
-done
-
-NEW_ARGS+=(
-  CODE_SIGNING_ALLOWED=NO
-  CODE_SIGNING_REQUIRED=NO
-  CODE_SIGN_IDENTITY=""
-  CODE_SIGN_ENTITLEMENTS=""
-  DEVELOPMENT_TEAM=""
-)
-
-echo "[xcodebuild-wrapper] Executing real xcodebuild without code signing requirement"
-exec "$REAL" "${NEW_ARGS[@]}"
-EOF
+          sudo cp scripts/ci/xcodebuild-wrapper.sh "$REAL_XCODEBUILD"
           sudo chmod +x "$REAL_XCODEBUILD"
           xcodebuild -version
 
@@ -152,11 +129,4 @@ EOF
           git push origin ":refs/tags/$TAG_NAME" || true
           gh release create "$TAG_NAME" TauriTavern-iOS15.8-iPhone7.ipa \
             --title "TauriTavern iOS 15.8 (iPhone 7 / TrollStore)" \
-            --notes "### TauriTavern iOS 15.8.3 Port for iPhone 7 (TrollStore)
-- **Target OS:** iOS 15.0 - 15.8.3 (iPhone 7 / A10 Fusion)
-- **Installation:** Download \`TauriTavern-iOS15.8-iPhone7.ipa\` and open directly in TrollStore 2 for permanent installation.
-- **Key Modifications:**
-  - Patched \`WKPreferences.setElementFullscreenEnabled\` selector check to prevent iOS 15 launch crash.
-  - Injected Safari 15 polyfills for ES2023 Array methods (\`toSorted\`, \`toReversed\`, \`toSpliced\`, \`with\`).
-  - Adjusted lookbehind regex in macro parser to maintain compatibility with iOS 15 WebKit.
-  - Built unsigned & ad-hoc signed specifically for TrollStore installation."
+            --notes "TauriTavern iOS 15.8.3 Port for iPhone 7 (TrollStore). Install via TrollStore 2 for permanent activation."
