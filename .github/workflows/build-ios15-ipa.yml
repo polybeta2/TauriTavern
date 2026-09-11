@@ -87,31 +87,33 @@ jobs:
 
       - name: Package IPA for TrollStore
         run: |
-          echo "=== Locating built .app bundle ==="
-          APP_PATH=$(find ~/Library/Developer/Xcode/DerivedData -name "tauritavern_iOS.app" -type d 2>/dev/null | grep -i "Release-iphoneos" | head -n 1)
-          if [ -z "$APP_PATH" ]; then
-            APP_PATH=$(find ~/Library/Developer/Xcode/DerivedData -name "*.app" -type d 2>/dev/null | head -n 1)
+          echo "=== Locating generated IPA or app bundle ==="
+          IPA_PATH=$(find . -name "*.ipa" -not -name "TauriTavern-iOS15.8-iPhone7.ipa" 2>/dev/null | head -n 1)
+          if [ -n "$IPA_PATH" ] && [ -f "$IPA_PATH" ]; then
+            echo "Found IPA created by export: $IPA_PATH"
+            cp "$IPA_PATH" TauriTavern-iOS15.8-iPhone7.ipa
+          else
+            echo "Searching for .app bundle in archive or DerivedData..."
+            APP_PATH=$(find . ~/Library/Developer/Xcode/DerivedData -name "tauritavern_iOS.app" -type d 2>/dev/null | head -n 1)
+            if [ -z "$APP_PATH" ]; then
+              APP_PATH=$(find . ~/Library/Developer/Xcode/DerivedData -name "*.app" -type d 2>/dev/null | head -n 1)
+            fi
+            echo "Found app bundle: $APP_PATH"
+            if [ -z "$APP_PATH" ] || [ ! -d "$APP_PATH" ]; then
+              echo "Error: Application bundle not found!"
+              find . -name "*.xcarchive" || true
+              exit 1
+            fi
+            echo "=== Ad-hoc signing app bundle ==="
+            codesign --force --deep --sign - "$APP_PATH" || true
+            echo "=== Creating IPA package ==="
+            rm -rf ipa_staging
+            mkdir -p ipa_staging/Payload
+            cp -R "$APP_PATH" ipa_staging/Payload/
+            cd ipa_staging
+            zip -r -9 ../TauriTavern-iOS15.8-iPhone7.ipa Payload
+            cd ..
           fi
-          if [ -z "$APP_PATH" ]; then
-            APP_PATH=$(find . -name "*.app" -type d 2>/dev/null | head -n 1)
-          fi
-          echo "Found app bundle: $APP_PATH"
-          if [ -z "$APP_PATH" ] || [ ! -d "$APP_PATH" ]; then
-            echo "Error: Application bundle not found!"
-            find ~/Library/Developer/Xcode/DerivedData -maxdepth 5 || true
-            exit 1
-          fi
-
-          echo "=== Ad-hoc signing app bundle ==="
-          codesign --force --deep --sign - "$APP_PATH" || true
-
-          echo "=== Creating IPA package ==="
-          rm -rf ipa_staging TauriTavern-iOS15.8-iPhone7.ipa
-          mkdir -p ipa_staging/Payload
-          cp -R "$APP_PATH" ipa_staging/Payload/
-          cd ipa_staging
-          zip -r -9 ../TauriTavern-iOS15.8-iPhone7.ipa Payload
-          cd ..
 
           ls -lh TauriTavern-iOS15.8-iPhone7.ipa
 
