@@ -7,6 +7,9 @@ on:
       - main
       - feat/ios15-iphone7-compat
 
+permissions:
+  contents: write
+
 jobs:
   build-ios:
     name: Build iOS IPA
@@ -25,6 +28,39 @@ jobs:
               break
             fi
           done
+          xcodebuild -version
+
+      - name: Setup unsigned xcodebuild wrapper
+        run: |
+          DEVELOPER_DIR=$(xcode-select -p)
+          echo "Xcode developer directory: $DEVELOPER_DIR"
+          REAL_XCODEBUILD="$DEVELOPER_DIR/usr/bin/xcodebuild"
+          
+          sudo mv "$REAL_XCODEBUILD" "${REAL_XCODEBUILD}.real"
+          sudo tee "$REAL_XCODEBUILD" > /dev/null << 'EOF'
+#!/bin/bash
+DEVELOPER_DIR=$(xcode-select -p)
+REAL="${DEVELOPER_DIR}/usr/bin/xcodebuild.real"
+
+NEW_ARGS=()
+for arg in "$@"; do
+  if [ "$arg" != "-allowProvisioningUpdates" ]; then
+    NEW_ARGS+=("$arg")
+  fi
+done
+
+NEW_ARGS+=(
+  CODE_SIGNING_ALLOWED=NO
+  CODE_SIGNING_REQUIRED=NO
+  CODE_SIGN_IDENTITY=""
+  CODE_SIGN_ENTITLEMENTS=""
+  DEVELOPMENT_TEAM=""
+)
+
+echo "[xcodebuild-wrapper] Executing real xcodebuild without code signing requirement"
+exec "$REAL" "${NEW_ARGS[@]}"
+EOF
+          sudo chmod +x "$REAL_XCODEBUILD"
           xcodebuild -version
 
       - name: Setup Rust toolchain
@@ -66,12 +102,61 @@ jobs:
           tauriScript: node ../../../scripts/tauri-app.mjs
           mobile: ios
           args: --verbose
-          uploadWorkflowArtifacts: true
-          uploadPlainBinary: true
-          workflowArtifactNamePattern: 'TauriTavern-iOS15.8-iPhone7-[platform]-[arch]-[bundle]'
+          uploadWorkflowArtifacts: false
+          uploadPlainBinary: false
 
-      - name: Locate and verify built IPA
-        if: always()
+      - name: Package IPA for TrollStore
         run: |
-          echo "=== Searching for generated IPA files ==="
-          find . -name "*.ipa" -ls || true
+          echo "=== Locating built .app bundle ==="
+          APP_PATH=$(find ~/Library/Developer/Xcode/DerivedData -name "tauritavern_iOS.app" -type d 2>/dev/null | grep -i "Release-iphoneos" | head -n 1)
+          if [ -z "$APP_PATH" ]; then
+            APP_PATH=$(find ~/Library/Developer/Xcode/DerivedData -name "*.app" -type d 2>/dev/null | head -n 1)
+          fi
+          if [ -z "$APP_PATH" ]; then
+            APP_PATH=$(find . -name "*.app" -type d 2>/dev/null | head -n 1)
+          fi
+          echo "Found app bundle: $APP_PATH"
+          if [ -z "$APP_PATH" ] || [ ! -d "$APP_PATH" ]; then
+            echo "Error: Application bundle not found!"
+            find ~/Library/Developer/Xcode/DerivedData -maxdepth 5 || true
+            exit 1
+          fi
+
+          echo "=== Ad-hoc signing app bundle ==="
+          codesign --force --deep --sign - "$APP_PATH" || true
+
+          echo "=== Creating IPA package ==="
+          rm -rf ipa_staging TauriTavern-iOS15.8-iPhone7.ipa
+          mkdir -p ipa_staging/Payload
+          cp -R "$APP_PATH" ipa_staging/Payload/
+          cd ipa_staging
+          zip -r -9 ../TauriTavern-iOS15.8-iPhone7.ipa Payload
+          cd ..
+
+          ls -lh TauriTavern-iOS15.8-iPhone7.ipa
+
+      - name: Upload TrollStore IPA Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: TauriTavern-iOS15.8-iPhone7-ipa
+          path: TauriTavern-iOS15.8-iPhone7.ipa
+          if-no-files-found: error
+
+      - name: Publish GitHub Release for easy mobile download
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG_NAME="v2.2.0-ios15-trollstore"
+          gh release delete "$TAG_NAME" -y || true
+          git tag -d "$TAG_NAME" || true
+          git push origin ":refs/tags/$TAG_NAME" || true
+          gh release create "$TAG_NAME" TauriTavern-iOS15.8-iPhone7.ipa \
+            --title "TauriTavern iOS 15.8 (iPhone 7 / TrollStore)" \
+            --notes "### TauriTavern iOS 15.8.3 Port for iPhone 7 (TrollStore)
+- **Target OS:** iOS 15.0 - 15.8.3 (iPhone 7 / A10 Fusion)
+- **Installation:** Download \`TauriTavern-iOS15.8-iPhone7.ipa\` and open directly in TrollStore 2 for permanent installation.
+- **Key Modifications:**
+  - Patched \`WKPreferences.setElementFullscreenEnabled\` selector check to prevent iOS 15 launch crash.
+  - Injected Safari 15 polyfills for ES2023 Array methods (\`toSorted\`, \`toReversed\`, \`toSpliced\`, \`with\`).
+  - Adjusted lookbehind regex in macro parser to maintain compatibility with iOS 15 WebKit.
+  - Built unsigned & ad-hoc signed specifically for TrollStore installation."
