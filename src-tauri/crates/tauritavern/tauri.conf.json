@@ -95,7 +95,7 @@
       }
     },
     "iOS": {
-      "developmentTeam": null,
+      "developmentTeam": "0000000000",
       "minimumSystemVersion": "15.0"
     }
   }

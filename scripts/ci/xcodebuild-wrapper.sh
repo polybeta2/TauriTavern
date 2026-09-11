@@ -4,6 +4,12 @@ set -e
 DEVELOPER_DIR=$(xcode-select -p)
 REAL="${DEVELOPER_DIR}/usr/bin/xcodebuild.real"
 
+for arg in "$@"; do
+  if [ "$arg" = "-version" ] || [ "$arg" = "-runFirstLaunch" ]; then
+    exec "$REAL" "$@"
+  fi
+done
+
 NEW_ARGS=()
 for arg in "$@"; do
   if [ "$arg" != "-allowProvisioningUpdates" ]; then

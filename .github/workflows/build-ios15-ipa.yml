@@ -29,6 +29,8 @@ jobs:
             fi
           done
           xcodebuild -version
+          sudo xcodebuild -runFirstLaunch || true
+          xcrun simctl list runtimes > /dev/null 2>&1 || true
 
       - name: Setup unsigned xcodebuild wrapper
         run: |
@@ -74,6 +76,7 @@ jobs:
         uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          APPLE_DEVELOPMENT_TEAM: "0000000000"
         with:
           projectPath: src-tauri/crates/tauritavern
           tauriScript: node ../../../scripts/tauri-app.mjs
