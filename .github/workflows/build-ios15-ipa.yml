@@ -10,10 +10,22 @@ on:
 jobs:
   build-ios:
     name: Build iOS IPA
-    runs-on: macos-14
+    runs-on: macos-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Select Xcode 16
+        run: |
+          ls -d /Applications/Xcode* || true
+          for app in /Applications/Xcode_16*.app /Applications/Xcode.app; do
+            if [ -d "$app" ]; then
+              echo "Selecting $app"
+              sudo xcode-select -s "$app"
+              break
+            fi
+          done
+          xcodebuild -version
 
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
