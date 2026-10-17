@@ -39,6 +39,7 @@ targets:
       path: tauritavern_iOS/Info.plist
       properties:
         LSRequiresIPhoneOS: true
+        NSBonjourServices: ["_tauritavern._tcp"]
         UILaunchStoryboardName: LaunchScreen
         UIRequiredDeviceCapabilities: [arm64, metal]
         UISupportedInterfaceOrientations:
