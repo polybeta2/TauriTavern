@@ -128,10 +128,10 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          TAG_NAME="v2.2.0-ios15-trollstore"
+          TAG_NAME="v2.3.0-ios15-trollstore"
           gh release delete "$TAG_NAME" -y || true
           git tag -d "$TAG_NAME" || true
           git push origin ":refs/tags/$TAG_NAME" || true
           gh release create "$TAG_NAME" TauriTavern-iOS15.8-iPhone7.ipa \
-            --title "TauriTavern iOS 15.8 (iPhone 7 / TrollStore)" \
-            --notes "TauriTavern iOS 15.8.3 Port for iPhone 7 (TrollStore). Install via TrollStore 2 for permanent activation."
+            --title "TauriTavern v2.3.0 iOS 15.8 (iPhone 7 / TrollStore)" \
+            --notes "TauriTavern v2.3.0 iOS 15.8.3 Port for iPhone 7 (TrollStore). Install via TrollStore 2 for permanent activation."

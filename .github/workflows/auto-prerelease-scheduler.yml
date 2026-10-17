@@ -1,9 +1,10 @@
 name: Auto Pre-Release Scheduler
 
 on:
-  schedule:
-    # GitHub schedules use UTC: 10:00 UTC is 18:00 in China.
-    - cron: "0 10 * * *"
+  # Scheduled Canary dispatch is specific to upstream (Darkatse/TauriTavern).
+  # Disabled in forks to prevent daily failed runs.
+  # schedule:
+  #   - cron: "0 10 * * *"
   workflow_dispatch:
 
 concurrency:
@@ -16,6 +17,7 @@ permissions:
 
 jobs:
   dispatch:
+    if: github.repository == 'Darkatse/TauriTavern'
     runs-on: ubuntu-latest
     name: dispatch-canary-dev
 
@@ -25,11 +27,22 @@ jobs:
         with:
           script: |
             const { owner, repo } = context.repo;
-            const { data: branchData } = await github.rest.repos.getBranch({
-              owner,
-              repo,
-              branch: "dev",
-            });
+            let branchData;
+            try {
+              const res = await github.rest.repos.getBranch({
+                owner,
+                repo,
+                branch: "dev",
+              });
+              branchData = res.data;
+            } catch (err) {
+              if (err.status === 404) {
+                core.info(`Branch 'dev' not found in ${owner}/${repo}; skipping Canary dispatch.`);
+                return;
+              }
+              throw err;
+            }
+
             const headSha = branchData.commit.sha;
             const { data: canaryCommit } = await github.rest.repos.getCommit({
               owner,
